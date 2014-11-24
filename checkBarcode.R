@@ -1,6 +1,7 @@
 ## This script checks whether the reads in each splitted file belong to the same barcode
-## and whether the filename contains the corresponding sample id name.
-## Note, this script is a memory hog. It is only intended to check the idemp code.
+## and whether the file name contains the corresponding sample id name.
+## Note, this script is a memory hog. 
+## It was used to check the idemp output for one of our miseq runs.
 ##source("http://bioconductor.org/biocLite.R")
 ##biocLite("ShortRead")
 require(ShortRead)
