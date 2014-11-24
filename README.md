@@ -4,6 +4,7 @@ idemp
 Barcode demultiplex for Illumina I1, R1, R2 fastq.gz files. 
 
 Only for typical Illumina runs, where the barcode sequence reads are saved in the I1_*.fastq.gz files, and the first fields of the sequence names are exactly same for I1, R1, and/or R2 fastq.gz files. This little program works as follows:
+
 1. compare sequence names in the I1, R1, R2 read files;
 2. read in barcode sequence from the I1 file;
 3. read in barcode and sample id table;
@@ -14,6 +15,7 @@ Only for typical Illumina runs, where the barcode sequence reads are saved in th
 8. by default, the cutoff=min(n, nEd), n(n=1) can be set by user.
 
 #### Compile and test
+
 1. download
 2. make
 3. make test
