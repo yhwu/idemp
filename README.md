@@ -16,9 +16,10 @@ Only for typical Illumina runs, where the barcode sequence reads are saved in th
 
 #### Compile and test
 
-1. download
-2. make
-3. make test
+1. git clone https://github.com/yhwu/idemp
+2. cd idemp
+3. make
+4. make test
 
 #### Usage
 ```
