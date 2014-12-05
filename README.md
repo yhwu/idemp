@@ -14,6 +14,10 @@ Only for typical Illumina runs, where the barcode sequence reads are saved in th
 7. assign a barcode sequence if the edit distance is smaller than a cutoff;
 8. by default, the cutoff=min(n, nEd), n(n=1) can be set by user.
 
+#### Functions to be added
+1. Trim R1 reads to get rid of barcode ends.
+
+
 #### Compile and test
 
 1. git clone https://github.com/yhwu/idemp

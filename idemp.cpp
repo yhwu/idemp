@@ -19,9 +19,9 @@ using namespace std;
 KSEQ_INIT(gzFile, gzread)
 
 void check_are_read_names_same(string I1File, string R1File, string R2File, 
-			       string& readBarcode)
+				 string& readBarcode)
 {
-  readBarcode="";
+readBarcode="";
   
   vector<string> inpFile(0);
   inpFile.push_back(I1File);
@@ -32,8 +32,8 @@ void check_are_read_names_same(string I1File, string R1File, string R2File,
   vector<kseq_t *> seq(inpFile.size());
   for(size_t i=0; i<inpFile.size(); ++i) {
     inpFH[i] = gzopen(inpFile[i].c_str(), "r");
-    if(inpFH[i]==Z_NULL){ cerr << "Cannot open " << inpFile[i] << endl; exit(1); }
-    seq[i] = kseq_init( inpFH[i] );
+if(inpFH[i]==Z_NULL){ cerr << "Cannot open " << inpFile[i] << endl; exit(1); }
+seq[i] = kseq_init( inpFH[i] );
   }
   
   bool isReadNameSame=true;
@@ -95,9 +95,10 @@ int main(int argc, char* argv[])
 {
   if ( argc < 2 ) return main_usage();
   
+  int res;
   string mycommand="";
   string barcodeFile="", I1File="", R1File="", R2File="", folder=".";
-  int nMismatch=1;
+  int nMismatch=1; 
   long int BUFFERSIZE=(int)600E6; // buffer size to hold reads, two buffers used
   
   /*  read in parameters
@@ -125,6 +126,9 @@ int main(int argc, char* argv[])
        << "Read2 reads:\t" << R2File << "\n"
        << "Output folder:\t" << folder << "\n"
        << endl;
+  
+  string cmd="mkdir -p " + folder;
+  res = system( cmd.c_str() );
   
   /*  1. read in barcode and sample id from barcodeFile 
    *     barcode: vector
@@ -274,6 +278,7 @@ int main(int argc, char* argv[])
   string fileName= p==string::npos ? tmps: tmps.substr(p+1);
   fileName=folder+"/"+fileName;
   ofstream FOUT(fileName.c_str());
+  if ( !FOUT ) { cerr << "Can't open " << fileName << endl; exit(0); }
   FOUT << "#seq\tbarcodeIdx\tbarcode\tmismatch\n";
   for(size_t i=0; i<readBarcode_qpos.size()-1; ++i) {
     string query=readBarcode.substr(readBarcode_qpos[i], 
@@ -309,8 +314,9 @@ int main(int argc, char* argv[])
     barcodeWrite[ readBarcodeIdx[i] ] = true;
     readsPerBarcode[ readBarcodeIdx[i] ] +=1;
   }
-  fileName=folder+"/"+fileName+".stat";
+  fileName += ".stat";
   FOUT.open(fileName.c_str());
+  if ( !FOUT ) { cerr << "Can't open " << fileName << endl; exit(0); }
   FOUT << "#barcode\tsampleid\tfreq\n";
   for(size_t i=0; i<barcode.size(); ++i) 
     FOUT << barcode[i] << "\t" << sampleid[i] << "\t" << readsPerBarcode[i] << endl;
@@ -341,18 +347,28 @@ int main(int argc, char* argv[])
     fileName= p==string::npos ? tmps: tmps.substr(p+1);
     fileName=folder+"/"+fileName;
     for(size_t i=0; i<barcode.size(); ++i) {
-      if ( barcodeWrite[i] ) {
-	outputNames[i] = fileName + "_" + sampleid[i] + ".fastq.gz";
-	cerr << barcode[i] << "\t" << outputNames[i] << endl;
-	outputfp[i] = gzopen(outputNames[i].c_str(), "wb");
-      }
+      if ( ! barcodeWrite[i] )  continue;
+      outputNames[i] = fileName + "_" + sampleid[i] + ".fastq.gz";
     }
     outputNames[barcode.size()]=fileName + "_unsigned.fastq.gz";
-    outputfp[barcode.size()] = gzopen(outputNames[barcode.size()].c_str(), "wb");
+    for(size_t i=0; i<=barcode.size(); ++i) {
+      if ( ! barcodeWrite[i] )  continue;
+      cerr << i << "\t"
+	   << ( i<barcode.size() ? barcode[i] : "undecoded" ) << "\t"
+	   << outputNames[i] << endl;
+      outputfp[i] = gzopen(outputNames[i].c_str(), "wb");
+      if ( outputfp[i] == Z_NULL ) {
+	cerr << "Can't open " << outputNames[i] << endl;
+	exit(0);
+      }
+    }
     
     int l;
     fp = gzopen(inputReadFile[iFile].c_str(), "r");
-    if(fp==Z_NULL){ cerr << "Cannot open " << I1File << endl; exit(1); }
+    if(fp==Z_NULL) { 
+      cerr << "Can't open " << inputReadFile[iFile] << endl; 
+      exit(1); 
+    }
     seq = kseq_init(fp);
     size_t icount=0;
     while ((l = kseq_read(seq)) >= 0) {

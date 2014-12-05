@@ -10,4 +10,4 @@ clean:
 	rm *.o idemp
 
 test:   idemp barcode_sample.txt I1.fastq R1.fastq R2.fastq
-	./idemp -b barcode_sample.txt -I1 I1.fastq -R1 R1.fastq -R2 R2.fastq
+	./idemp -b barcode_sample.txt -I1 I1.fastq -R1 R1.fastq -R2 R2.fastq -o test
