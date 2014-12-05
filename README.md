@@ -1,6 +1,8 @@
 idemp
 =====
 
+Work needs to be done: trim R1 reads to get rid of barcodes in case R1 reads into barcode when template is short.
+
 Barcode demultiplex for Illumina I1, R1, R2 fastq.gz files. 
 
 Only for typical Illumina runs, where the barcode sequence reads are saved in the I1_*.fastq.gz files, and the first fields of the sequence names are exactly same for I1, R1, and/or R2 fastq.gz files. This little program works as follows:
