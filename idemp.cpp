@@ -294,10 +294,11 @@ int main(int argc, char* argv[])
 	 << readBarcodeMis[i] << endl;
     */
     //FOUT << seqname << "\t" 
+    if ( readBarcodeMis[i] <= nMismatch){
     FOUT << query << "\t"
 	 << readBarcodeIdx[i] << "\t"
 	 << barcode[ readBarcodeIdx[i] ] << "\t"
-	 << readBarcodeMis[i] << "\n";
+	 << readBarcodeMis[i] << "\n";}
     
     if ( readBarcodeMis[i] > minEditDistance ) readBarcodeIdx[i]=barcode.size();
     if ( readBarcodeMis[i] > nMismatch ) readBarcodeIdx[i]=barcode.size();
