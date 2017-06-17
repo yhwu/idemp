@@ -22,65 +22,6 @@ using namespace std;
 
 KSEQ_INIT(gzFile, gzread)
 
-/* check that R1 and R2 have the same read names, read in I1 reads */
-void check_are_read_names_same(string I1File, string R1File, string R2File,
-        string& readBarcode) {
-    readBarcode = "";
-
-    vector<string> inpFile(0);
-    inpFile.push_back(I1File);
-    inpFile.push_back(R1File);
-    if (R2File != "") inpFile.push_back(R2File);
-
-    vector<gzFile> inpFH(inpFile.size(), Z_NULL);
-    vector<kseq_t *> seq(inpFile.size());
-    for (size_t i = 0; i < inpFile.size(); ++i) {
-        inpFH[i] = gzopen(inpFile[i].c_str(), "r");
-        if (inpFH[i] == Z_NULL) {
-            cerr << "Cannot open " << inpFile[i] << endl;
-            exit(1);
-        }
-        seq[i] = kseq_init(inpFH[i]);
-    }
-
-    bool isReadNameSame = true;
-    bool readDone = false;
-    vector<int> l(inpFile.size());
-    vector<string> sname(inpFile.size());
-    size_t icount = 0;
-    while (!readDone) {
-        readDone = true;
-        for (size_t i = 0; i < inpFile.size(); ++i) {
-            l[i] = kseq_read(seq[i]);
-            sname[i] = string(seq[i]->name.s);
-            if (l[i] >= 0) readDone = false;
-        }
-        if (readDone) break; // done reading all reads 
-        ++icount;
-        readBarcode += string(seq[0]->seq.s) + "\t";
-        for (size_t i = 1; i < inpFile.size(); ++i) {
-            if (sname[i] == sname[i - 1]) continue;
-            isReadNameSame = false;
-            cerr << "Read names are different at read " << icount << " "
-                    << "between files\n" << inpFile[i - 1] << " " << inpFile[i] << endl
-                    << sname[i - 1] << "\n" << sname[i] << endl;
-            break;
-        }
-    }
-
-    if ( ! isReadNameSame ) {
-        cerr << "Read names are not same, exit" << endl;
-        exit(1);
-    }
-    cerr << "Read names are same:\t" << isReadNameSame << endl;
-
-    for (size_t i = 0; i < inpFile.size(); ++i) {
-        gzclose(inpFH[i]);
-        kseq_destroy(seq[i]);
-    }
-}
-
-
 /*ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc*/
 int main_usage() {
     cerr << "Usage:\n"
@@ -166,24 +107,8 @@ int main(int argc, char* argv[]) {
      *  3. check conflicks
      */
     vector<string> barcode(0), sampleid(0);
-    ifstream FIN(barcodeFile.c_str());
-    if (!FIN) {
-        cerr << "Cannot open " << barcodeFile << endl;
-        exit(1);
-    }
-    string tmps1, tmps2;
-    while (FIN >> tmps1 >> tmps2) {
-        if (tmps1[0] == '#') continue;
-        if (tmps1.find("arcode") != string::npos) continue;
-        barcode.push_back(tmps1);
-        sampleid.push_back(tmps2);
-    }
-    FIN.close();
-    if (barcode.empty()) {
-        cerr << "no barcode found in file " << barcodeFile << endl;
-        return 1;
-    }
-    
+    read_barcode_sampleid(barcodeFile, barcode, sampleid);
+
     for (size_t i = 0; i < barcode.size(); ++i)
         cerr << barcode[i] << "\t" << sampleid[i] << endl;
     cerr << "barcodes:\t" << barcode.size() << endl << endl;
@@ -292,7 +217,7 @@ int main(int argc, char* argv[]) {
                 if (minMismatch <= 1) continue;
             }
         }
-        if ( minMismatch<=1 ) continue;
+        if (minMismatch <= 1) continue;
 
         // check edit distance
         for (size_t j = 0; j < barcode.size(); ++j) {

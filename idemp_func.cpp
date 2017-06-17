@@ -21,6 +21,29 @@ using namespace std;
 
 KSEQ_INIT(gzFile, gzread)
 
+
+void read_barcode_sampleid(string barcodeFile, 
+        vector<string> & barcode, vector<string> & sampleid){
+
+    ifstream FIN(barcodeFile.c_str());
+    if (!FIN) {
+        cerr << "Cannot open " << barcodeFile << endl;
+        exit(1);
+    }
+    string tmps1, tmps2;
+    while (FIN >> tmps1 >> tmps2) {
+        if (tmps1[0] == '#') continue;
+        if (tmps1.find("arcode") != string::npos) continue;
+        barcode.push_back(tmps1);
+        sampleid.push_back(tmps2);
+    }
+    FIN.close();
+
+    if (barcode.empty()) throw std::invalid_argument( "no barcode found" );
+
+}
+
+
 /* check that R1 and R2 have the same read names, read in I1 reads */
 void check_are_read_names_same(string I1File, string R1File, string R2File,
         string& readBarcode) {

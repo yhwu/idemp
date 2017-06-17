@@ -20,5 +20,11 @@ class IdempArgument {
 
 IdempArgument parse_arguments(int argc, char* argv[]);
 
+void read_barcode_sampleid(string barcodeFile, 
+        vector<string> & barcode, vector<string> & sampleid);
+
+void check_are_read_names_same(string I1File, string R1File, string R2File,
+        string& readBarcode);
+
 #endif /* IDEMP_H */
 

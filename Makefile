@@ -9,7 +9,7 @@ else
 endif
 
 
-idemp: idemp.o functions.o
+idemp: idemp.o idemp_func.o functions.o
 	$(CXX) $(CXXFLAGS) $? -o $@ -lz
 	
 idemp.o: idemp.cpp
