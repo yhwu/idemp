@@ -9,16 +9,20 @@
 #include <vector>
 #include <unistd.h>
 #include <zlib.h>
+#include <unordered_map>
 //#include <sys/types.h>
-//#include <cstdlib>
+#include <cstdlib>
+//#include <stdlib>
 using namespace std;
 
 /**** user headers ****/
 #include "functions.h"
+#include "idemp_func.h"
 #include "kseq.h"
 
 KSEQ_INIT(gzFile, gzread)
 
+/* check that R1 and R2 have the same read names, read in I1 reads */
 void check_are_read_names_same(string I1File, string R1File, string R2File,
         string& readBarcode) {
     readBarcode = "";
@@ -64,6 +68,10 @@ void check_are_read_names_same(string I1File, string R1File, string R2File,
         }
     }
 
+    if ( ! isReadNameSame ) {
+        cerr << "Read names are not same, exit" << endl;
+        exit(1);
+    }
     cerr << "Read names are same:\t" << isReadNameSame << endl;
 
     for (size_t i = 0; i < inpFile.size(); ++i) {
@@ -71,6 +79,7 @@ void check_are_read_names_same(string I1File, string R1File, string R2File,
         kseq_destroy(seq[i]);
     }
 }
+
 
 /*ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc*/
 int main_usage() {
@@ -164,7 +173,7 @@ int main(int argc, char* argv[]) {
     }
     string tmps1, tmps2;
     while (FIN >> tmps1 >> tmps2) {
-        if (tmps1[1] == '#') continue;
+        if (tmps1[0] == '#') continue;
         if (tmps1.find("arcode") != string::npos) continue;
         barcode.push_back(tmps1);
         sampleid.push_back(tmps2);
@@ -174,6 +183,7 @@ int main(int argc, char* argv[]) {
         cerr << "no barcode found in file " << barcodeFile << endl;
         return 1;
     }
+    
     for (size_t i = 0; i < barcode.size(); ++i)
         cerr << barcode[i] << "\t" << sampleid[i] << endl;
     cerr << "barcodes:\t" << barcode.size() << endl << endl;
@@ -205,6 +215,7 @@ int main(int argc, char* argv[]) {
     cerr << "\nClosest barcodes, editDistance=" << minEditDistance << endl;
     for (size_t i = 0; i < miniEdbarcodes.size(); ++i) cerr << miniEdbarcodes[i] << endl;
     cerr << endl;
+
     /* check if any sampleids are same */
     for (size_t i = 0; i < sampleid.size(); ++i) {
         for (size_t j = i + 1; j < sampleid.size(); ++j) {
@@ -219,14 +230,14 @@ int main(int argc, char* argv[]) {
     }
 
     /* check if the sequence names are same
-     * read in sequence barcodes into a single string
      * index the barcodes delimiters
      */
     string readBarcode = "";
     readBarcode.reserve(BUFFERSIZE + 1);
+    check_are_read_names_same(I1File, R1File, R2File, readBarcode);
+
     vector<size_t> readBarcode_qpos(0);
     readBarcode_qpos.push_back(0);
-    check_are_read_names_same(I1File, R1File, R2File, readBarcode);
     for (size_t i = 0; i < readBarcode.size(); ++i)
         if (readBarcode[i] == '\t') readBarcode_qpos.push_back(i + 1);
 
@@ -235,6 +246,7 @@ int main(int argc, char* argv[]) {
      * if not, if only one single base mutation return 
      * if not, check edit distance
      * Note: more than 80% barcodes should perfectly match
+     * Note: last readBarcode_qpos points to string end
      * Return: 
      *     readBarcodeIdx match index 
      *     readBarcodeMis mismatches, edit distance
@@ -244,12 +256,11 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < readBarcode_qpos.size() - 1; ++i) {
         string query = readBarcode.substr(readBarcode_qpos[i],
                 readBarcode_qpos[i + 1] - readBarcode_qpos[i] - 1);
-        // cerr << query << endl;
-        // string seqname=readName.substr(readName_qpos[i], 
-        //				   readName_qpos[i+1]-readName_qpos[i]-1 );
 
         if ((i + 1) % 1000000 == 0) cerr << i + 1 << endl;
-        if (query.size() != barcode[0].size()) continue;
+        if (query.size() != barcode[0].size()) {
+            cerr << "Warning " << query << " does not same length with other barcodes" << endl;
+        };
 
         // check exact match
         bool ismatched = false;
@@ -263,10 +274,17 @@ int main(int argc, char* argv[]) {
         if (ismatched) continue;
 
         int minMismatch = query.size();
+
         // check single base mutation
         for (size_t j = 0; j < barcode.size(); ++j) {
             int mismatch = 0;
-            for (size_t k = 0; k < query.size(); ++k) mismatch += (query[k] != barcode[j][k]);
+            for (size_t k = 0; k < query.size(); ++k) {
+                mismatch += (query[k] != barcode[j][k]);
+                if (mismatch >= minEditDistance) {
+                    mismatch = query.size();
+                    break;
+                }
+            }
             if (mismatch < minMismatch) {
                 minMismatch = mismatch;
                 readBarcodeIdx[i] = j;
@@ -274,9 +292,9 @@ int main(int argc, char* argv[]) {
                 if (minMismatch <= 1) continue;
             }
         }
-        //if ( minMismatch<=2 ) continue;
+        if ( minMismatch<=1 ) continue;
 
-        // check deletion or insertation of single base
+        // check edit distance
         for (size_t j = 0; j < barcode.size(); ++j) {
             int mismatch = edit_distance(query, barcode[j]);
             if (mismatch < minMismatch) {
@@ -308,19 +326,11 @@ int main(int argc, char* argv[]) {
     }
     FOUT << "#seq\tbarcodeIdx\tbarcode\tmismatch\n";
     for (size_t i = 0; i < readBarcode_qpos.size() - 1; ++i) {
+
         string query = readBarcode.substr(readBarcode_qpos[i],
                 readBarcode_qpos[i + 1] - readBarcode_qpos[i] - 1);
-        //string seqname=readName.substr(readName_qpos[i], 
-        //				   readName_qpos[i+1]-readName_qpos[i]-1 );
 
-        /*
-          cerr << i+1 << "\t|" << query << "|\t"
-          //<< seqname << "|\t"
-          << readBarcodeIdx[i] << "\t"
-             << barcode[ readBarcodeIdx[i] ] << "\t"
-             << readBarcodeMis[i] << endl;
-         */
-        //FOUT << seqname << "\t" 
+        cerr << query << '\t' << readBarcodeMis[i] << endl;
         if (readBarcodeMis[i] <= nMismatch) {
             FOUT << query << "\t"
                     << readBarcodeIdx[i] << "\t"
@@ -328,7 +338,7 @@ int main(int argc, char* argv[]) {
                     << readBarcodeMis[i] << "\n";
         }
 
-        if (readBarcodeMis[i] > minEditDistance) readBarcodeIdx[i] = barcode.size();
+        if (readBarcodeMis[i] >= minEditDistance) readBarcodeIdx[i] = barcode.size();
         if (readBarcodeMis[i] > nMismatch) readBarcodeIdx[i] = barcode.size();
     }
     FOUT.close();
