@@ -113,59 +113,6 @@ int main(int argc, char* argv[]) {
     vector<int> readBarcodeMis(readBarcode_qpos.size() - 1, barcode[0].size());
 
     map_readbarcode(readBarcode, readBarcode_qpos, barcode, minEditDistance, readBarcodeIdx, readBarcodeMis);
-//    
-//    for (size_t i = 0; i < readBarcode_qpos.size() - 1; ++i) {
-//        string query = readBarcode.substr(readBarcode_qpos[i],
-//                readBarcode_qpos[i + 1] - readBarcode_qpos[i] - 1);
-//
-//        if ((i + 1) % 1000000 == 0) cerr << i + 1 << endl;
-//        if (query.size() != barcode[0].size()) {
-//            cerr << "Warning " << query << " does not same length with other barcodes" << endl;
-//        };
-//
-//        // check exact match
-//        bool ismatched = false;
-//        for (size_t j = 0; j < barcode.size(); ++j) {
-//            if (query != barcode[j]) continue;
-//            ismatched = true;
-//            readBarcodeIdx[i] = j;
-//            readBarcodeMis[i] = 0;
-//            break;
-//        }
-//        if (ismatched) continue;
-//
-//        int minMismatch = query.size();
-//
-//        // check single base mutation
-//        for (size_t j = 0; j < barcode.size(); ++j) {
-//            int mismatch = 0;
-//            for (size_t k = 0; k < query.size(); ++k) {
-//                mismatch += (query[k] != barcode[j][k]);
-//                if (mismatch >= minEditDistance) {
-//                    mismatch = query.size();
-//                    break;
-//                }
-//            }
-//            if (mismatch < minMismatch) {
-//                minMismatch = mismatch;
-//                readBarcodeIdx[i] = j;
-//                readBarcodeMis[i] = minMismatch;
-//                if (minMismatch <= 1) continue;
-//            }
-//        }
-//        if (minMismatch <= 1) continue;
-//
-//        // check edit distance
-//        for (size_t j = 0; j < barcode.size(); ++j) {
-//            int mismatch = edit_distance(query, barcode[j]);
-//            if (mismatch < minMismatch) {
-//                minMismatch = mismatch;
-//                readBarcodeIdx[i] = j;
-//                readBarcodeMis[i] = minMismatch;
-//            }
-//        }
-//
-//    }
     cerr << "Done matching barcodes" << endl;
 
     /* write sequence barcodes assignment
