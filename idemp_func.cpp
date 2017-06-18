@@ -22,8 +22,115 @@ using namespace std;
 KSEQ_INIT(gzFile, gzread)
 
 
-void read_barcode_sampleid(string barcodeFile, 
-        vector<string> & barcode, vector<string> & sampleid){
+void map_readbarcode(string & readBarcode, vector<size_t> & readBarcode_qpos, vector<string> & barcode,
+        int minEditDistance,
+        vector<int> & readBarcodeIdx, vector<int> & readBarcodeMis) {
+
+    for (size_t i = 0; i < readBarcode_qpos.size() - 1; ++i) {
+        string query = readBarcode.substr(readBarcode_qpos[i],
+                readBarcode_qpos[i + 1] - readBarcode_qpos[i] - 1);
+
+        if ((i + 1) % 1000000 == 0) cerr << i + 1 << endl;
+        if (query.size() != barcode[0].size()) {
+            cerr << "Warning " << query << " does not have same length with barcodes" << endl;
+        };
+
+        // check exact match
+        bool ismatched = false;
+        for (size_t j = 0; j < barcode.size(); ++j) {
+            if (query != barcode[j]) continue;
+            ismatched = true;
+            readBarcodeIdx[i] = j;
+            readBarcodeMis[i] = 0;
+            break;
+        }
+        if (ismatched) continue;
+
+        int minMismatch = query.size();
+
+        // check single base mutation
+        for (size_t j = 0; j < barcode.size(); ++j) {
+            int mismatch = 0;
+            for (size_t k = 0; k < query.size(); ++k) {
+                mismatch += (query[k] != barcode[j][k]);
+                if (mismatch >= minEditDistance) {
+                    mismatch = query.size();
+                    break;
+                }
+            }
+            if (mismatch < minMismatch) {
+                minMismatch = mismatch;
+                readBarcodeIdx[i] = j;
+                readBarcodeMis[i] = minMismatch;
+                if (minMismatch <= 1) continue;
+            }
+        }
+        if (minMismatch <= 1) continue;
+
+        // check edit distance
+        for (size_t j = 0; j < barcode.size(); ++j) {
+            int mismatch = edit_distance(query, barcode[j]);
+            if (mismatch < minMismatch) {
+                minMismatch = mismatch;
+                readBarcodeIdx[i] = j;
+                readBarcodeMis[i] = minMismatch;
+            }
+        }
+
+    }
+
+}
+
+int min_edit_distance(vector<string> & barcode, vector<string> & sampleid) {
+    int minEditDistance = barcode[0].length();
+
+    vector<string> miniEdbarcodes(0);
+    cerr << "Pairwise barcode edit distance:" << endl;
+    for (size_t i = 0; i < barcode.size(); ++i) {
+        for (size_t j = 0; j <= i; ++j) {
+            int ed = edit_distance(barcode[i], barcode[j]);
+            if (j == 0) cerr << ed;
+            else cerr << " " << ed;
+            if (minEditDistance >= ed && i > j) {
+                if (minEditDistance > ed) miniEdbarcodes.clear();
+                minEditDistance = ed;
+                miniEdbarcodes.push_back(barcode[i] + ":" + barcode[j]);
+            }
+            if ((ed == 0) &&
+                    (j < i) &&
+                    (sampleid[i] != sampleid[j])) {
+                cerr << "one barcode points to two sampleids:\n"
+                        << barcode[i] << "\t" << sampleid[i] << "\t" << sampleid[j]
+                        << endl;
+                throw std::invalid_argument("duplicated sample ids");
+            }
+        }
+        cerr << endl;
+    }
+
+    cerr << "\nClosest barcodes, editDistance=" << minEditDistance << endl;
+    for (size_t i = 0; i < miniEdbarcodes.size(); ++i) cerr << miniEdbarcodes[i] << endl;
+    cerr << endl;
+
+    /* check if any sampleids are same */
+    for (size_t i = 0; i < sampleid.size(); ++i) {
+        for (size_t j = i + 1; j < sampleid.size(); ++j) {
+            if (sampleid[i] == sampleid[j]) {
+                if (barcode[i] != barcode[j]) {
+                    cerr << "two barcodes point to the same sampleid:\n"
+                            << barcode[i] << "\t" << barcode[j] << "\t" << sampleid[i]
+                            << endl;
+                    throw std::invalid_argument("duplicated barcodes for one sampleid");
+                }
+            }
+        }
+    }
+
+    return minEditDistance;
+}
+
+void read_barcode_sampleid(string barcodeFile,
+        vector<string> & barcode, vector<string> & sampleid) {
 
     ifstream FIN(barcodeFile.c_str());
     if (!FIN) {
@@ -39,10 +146,9 @@ void read_barcode_sampleid(string barcodeFile,
     }
     FIN.close();
 
-    if (barcode.empty()) throw std::invalid_argument( "no barcode found" );
+    if (barcode.empty()) throw std::invalid_argument("no barcode found");
 
 }
-
 
 /* check that R1 and R2 have the same read names, read in I1 reads */
 void check_are_read_names_same(string I1File, string R1File, string R2File,
@@ -90,7 +196,7 @@ void check_are_read_names_same(string I1File, string R1File, string R2File,
         }
     }
 
-    if ( ! isReadNameSame ) {
+    if (!isReadNameSame) {
         cerr << "Read names are not same, exit" << endl;
         exit(1);
     }
@@ -102,7 +208,6 @@ void check_are_read_names_same(string I1File, string R1File, string R2File,
     }
 }
 
-
 /* parse input */
 IdempArgument parse_arguments(int argc, char* argv[]) {
     std::unordered_map<std::string, std::string> args;
@@ -110,30 +215,48 @@ IdempArgument parse_arguments(int argc, char* argv[]) {
     vector<string> ARGV(0);
     for (int i = 0; i < argc; ++i) ARGV.push_back(string(argv[i]));
     for (int i = 1; i < (int) ARGV.size(); ++i) {
-        if (ARGV[i] == "-b") { args["barcodeFile"] = ARGV[i + 1]; continue;}
-        if (ARGV[i] == "-I1") { args["I1File"] = ARGV[i + 1]; continue;}
-        if (ARGV[i] == "-R1") { args["R1File"] = ARGV[i + 1]; continue;}
-        if (ARGV[i] == "-R2") { args["R2File"] = ARGV[i + 1]; continue; }
-        if (ARGV[i] == "-m") { args["nMismatch"] = ARGV[i + 1]; continue;}
-        if (ARGV[i] == "-o") { args["outputFolder"] = ARGV[i + 1]; continue;}
+        if (ARGV[i] == "-b") {
+            args["barcodeFile"] = ARGV[i + 1];
+            continue;
+        }
+        if (ARGV[i] == "-I1") {
+            args["I1File"] = ARGV[i + 1];
+            continue;
+        }
+        if (ARGV[i] == "-R1") {
+            args["R1File"] = ARGV[i + 1];
+            continue;
+        }
+        if (ARGV[i] == "-R2") {
+            args["R2File"] = ARGV[i + 1];
+            continue;
+        }
+        if (ARGV[i] == "-m") {
+            args["nMismatch"] = ARGV[i + 1];
+            continue;
+        }
+        if (ARGV[i] == "-o") {
+            args["outputFolder"] = ARGV[i + 1];
+            continue;
+        }
     }
-    
+
     IdempArgument arg;
-    
+
     got = args.find("barcodeFile");
     std::string barcodeFile = got == args.end() ? "" : args["barcodeFile"];
 
     if (args.find("barcodeFile") == args.end()) throw std::invalid_argument("need barcodeFile, -b barcodeFile");
-    if (args.find("I1File") == args.end()) throw std::invalid_argument( "need I1File, -I1 I1File" );
-    if (args.find("R1File") == args.end()) throw std::invalid_argument( "need R1File, -R1 R1File" );
-    if (args.find("R2File") == args.end()) throw std::invalid_argument( "need R2File, -R2 R1File" );
+    if (args.find("I1File") == args.end()) throw std::invalid_argument("need I1File, -I1 I1File");
+    if (args.find("R1File") == args.end()) throw std::invalid_argument("need R1File, -R1 R1File");
+    if (args.find("R2File") == args.end()) throw std::invalid_argument("need R2File, -R2 R1File");
 
     if (args.find("nMismatch") != args.end()) arg.nMismatch = std::stoi(args["nMismatch"]);
-    if (args.find("outputFolder") != args.end() ) arg.outputFolder = args["outputFolder"];
-    arg.barcodeFile = args["barcodeFile"]; 
+    if (args.find("outputFolder") != args.end()) arg.outputFolder = args["outputFolder"];
+    arg.barcodeFile = args["barcodeFile"];
     arg.I1File = args["I1File"];
     arg.R1File = args["R1File"];
     arg.R2File = args["R2File"];
-        
+
     return arg;
 }

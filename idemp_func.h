@@ -18,6 +18,7 @@ class IdempArgument {
     int nMismatch=1;
 };
 
+
 IdempArgument parse_arguments(int argc, char* argv[]);
 
 void read_barcode_sampleid(string barcodeFile, 
@@ -25,6 +26,13 @@ void read_barcode_sampleid(string barcodeFile,
 
 void check_are_read_names_same(string I1File, string R1File, string R2File,
         string& readBarcode);
+
+void map_readbarcode(string & readBarcode, vector<size_t> & readBarcode_qpos, vector<string> & barcode,
+        int minEditDistance,
+        vector<int> & readBarcodeIdx, vector<int> & readBarcodeMis);
+
+
+int min_edit_distance(vector<string> & barcode, vector<string> & sampleid);
 
 #endif /* IDEMP_H */
 

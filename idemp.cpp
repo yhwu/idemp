@@ -22,6 +22,7 @@ using namespace std;
 
 KSEQ_INIT(gzFile, gzread)
 
+
 /*ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc*/
 int main_usage() {
     cerr << "Usage:\n"
@@ -48,8 +49,6 @@ int main(int argc, char* argv[]) {
 
     int res;
     string mycommand = "";
-    string barcodeFile = "", I1File = "", R1File = "", R2File = "", folder = ".";
-    int nMismatch = 1;
     long int BUFFERSIZE = (int) 600E6; // buffer size to hold reads, two buffers used
 
     /*  read in parameters
@@ -59,44 +58,15 @@ int main(int argc, char* argv[]) {
      *  R2File: read2 fastq file
      *  folder: output folder, default to current .
      */
-    vector<string> ARGV(0);
-    for (int i = 0; i < argc; ++i) ARGV.push_back(string(argv[i]));
-    for (int i = 1; i < (int) ARGV.size(); ++i) {
-#define _next2 ARGV[i]=""; ARGV[i+1]=""; continue;
-#define _next1 ARGV[i]=""; continue;
-        if (ARGV[i] == "-b") {
-            barcodeFile = ARGV[i + 1];
-            _next2;
-        }
-        if (ARGV[i] == "-I1") {
-            I1File = ARGV[i + 1];
-            _next2;
-        }
-        if (ARGV[i] == "-R1") {
-            R1File = ARGV[i + 1];
-            _next2;
-        }
-        if (ARGV[i] == "-R2") {
-            R2File = ARGV[i + 1];
-            _next2;
-        }
-        if (ARGV[i] == "-m") {
-            nMismatch = atoi(ARGV[i + 1].c_str());
-            _next2;
-        }
-        if (ARGV[i] == "-o") {
-            folder = ARGV[i + 1];
-            _next2;
-        }
-    }
-    cerr << "barcode:\t" << barcodeFile << "\n"
-            << "Index reads:\t" << I1File << "\n"
-            << "Read1 reads:\t" << R1File << "\n"
-            << "Read2 reads:\t" << R2File << "\n"
-            << "Output folder:\t" << folder << "\n"
+    IdempArgument arg = parse_arguments(argc, argv);
+    cerr << "barcode:\t" << arg.barcodeFile << "\n"
+            << "Index reads:\t" << arg.I1File << "\n"
+            << "Read1 reads:\t" << arg.R1File << "\n"
+            << "Read2 reads:\t" << arg.R2File << "\n"
+            << "Output folder:\t" << arg.outputFolder << "\n"
             << endl;
 
-    string cmd = "mkdir -p " + folder;
+    string cmd = "mkdir -p " + arg.outputFolder;
     res = system(cmd.c_str());
 
     /*  1. read in barcode and sample id from barcodeFile 
@@ -107,59 +77,22 @@ int main(int argc, char* argv[]) {
      *  3. check conflicks
      */
     vector<string> barcode(0), sampleid(0);
-    read_barcode_sampleid(barcodeFile, barcode, sampleid);
+    read_barcode_sampleid(arg.barcodeFile, barcode, sampleid);
 
-    for (size_t i = 0; i < barcode.size(); ++i)
-        cerr << barcode[i] << "\t" << sampleid[i] << endl;
+    for (size_t i = 0; i < barcode.size(); ++i) cerr << barcode[i] << "\t" << sampleid[i] << endl;
     cerr << "barcodes:\t" << barcode.size() << endl << endl;
+
     /* check edit distance beyween barcodes */
-    int minEditDistance = barcode[1].length();
-    vector<string> miniEdbarcodes(0);
-    cerr << "Pairwise barcode edit distance:" << endl;
-    for (size_t i = 0; i < barcode.size(); ++i) {
-        for (size_t j = 0; j <= i; ++j) {
-            int ed = edit_distance(barcode[i], barcode[j]);
-            if (j == 0) cerr << ed;
-            else cerr << " " << ed;
-            if (minEditDistance >= ed && i > j) {
-                if (minEditDistance > ed) miniEdbarcodes.clear();
-                minEditDistance = ed;
-                miniEdbarcodes.push_back(barcode[i] + ":" + barcode[j]);
-            }
-            if (ed == 0 && i < j) {
-                if (sampleid[i] != sampleid[j]) {
-                    cerr << "one barcode points to two sampleids:\n"
-                            << barcode[i] << "\t" << sampleid[i] << "\t" << sampleid[j]
-                            << endl;
-                }
-            }
+    int minEditDistance = min_edit_distance(barcode, sampleid);
 
-        }
-        cerr << endl;
-    }
-    cerr << "\nClosest barcodes, editDistance=" << minEditDistance << endl;
-    for (size_t i = 0; i < miniEdbarcodes.size(); ++i) cerr << miniEdbarcodes[i] << endl;
-    cerr << endl;
 
-    /* check if any sampleids are same */
-    for (size_t i = 0; i < sampleid.size(); ++i) {
-        for (size_t j = i + 1; j < sampleid.size(); ++j) {
-            if (sampleid[i] == sampleid[j]) {
-                if (barcode[i] != barcode[j]) {
-                    cerr << "two barcodes point to the same sampleid:\n"
-                            << barcode[i] << "\t" << barcode[j] << "\t" << sampleid[i]
-                            << endl;
-                }
-            }
-        }
-    }
 
     /* check if the sequence names are same
      * index the barcodes delimiters
      */
     string readBarcode = "";
     readBarcode.reserve(BUFFERSIZE + 1);
-    check_are_read_names_same(I1File, R1File, R2File, readBarcode);
+    check_are_read_names_same(arg.I1File, arg.R1File, arg.R2File, readBarcode);
 
     vector<size_t> readBarcode_qpos(0);
     readBarcode_qpos.push_back(0);
@@ -178,58 +111,61 @@ int main(int argc, char* argv[]) {
      */
     vector<int> readBarcodeIdx(readBarcode_qpos.size() - 1, barcode.size());
     vector<int> readBarcodeMis(readBarcode_qpos.size() - 1, barcode[0].size());
-    for (size_t i = 0; i < readBarcode_qpos.size() - 1; ++i) {
-        string query = readBarcode.substr(readBarcode_qpos[i],
-                readBarcode_qpos[i + 1] - readBarcode_qpos[i] - 1);
 
-        if ((i + 1) % 1000000 == 0) cerr << i + 1 << endl;
-        if (query.size() != barcode[0].size()) {
-            cerr << "Warning " << query << " does not same length with other barcodes" << endl;
-        };
-
-        // check exact match
-        bool ismatched = false;
-        for (size_t j = 0; j < barcode.size(); ++j) {
-            if (query != barcode[j]) continue;
-            ismatched = true;
-            readBarcodeIdx[i] = j;
-            readBarcodeMis[i] = 0;
-            break;
-        }
-        if (ismatched) continue;
-
-        int minMismatch = query.size();
-
-        // check single base mutation
-        for (size_t j = 0; j < barcode.size(); ++j) {
-            int mismatch = 0;
-            for (size_t k = 0; k < query.size(); ++k) {
-                mismatch += (query[k] != barcode[j][k]);
-                if (mismatch >= minEditDistance) {
-                    mismatch = query.size();
-                    break;
-                }
-            }
-            if (mismatch < minMismatch) {
-                minMismatch = mismatch;
-                readBarcodeIdx[i] = j;
-                readBarcodeMis[i] = minMismatch;
-                if (minMismatch <= 1) continue;
-            }
-        }
-        if (minMismatch <= 1) continue;
-
-        // check edit distance
-        for (size_t j = 0; j < barcode.size(); ++j) {
-            int mismatch = edit_distance(query, barcode[j]);
-            if (mismatch < minMismatch) {
-                minMismatch = mismatch;
-                readBarcodeIdx[i] = j;
-                readBarcodeMis[i] = minMismatch;
-            }
-        }
-
-    }
+    map_readbarcode(readBarcode, readBarcode_qpos, barcode, minEditDistance, readBarcodeIdx, readBarcodeMis);
+//    
+//    for (size_t i = 0; i < readBarcode_qpos.size() - 1; ++i) {
+//        string query = readBarcode.substr(readBarcode_qpos[i],
+//                readBarcode_qpos[i + 1] - readBarcode_qpos[i] - 1);
+//
+//        if ((i + 1) % 1000000 == 0) cerr << i + 1 << endl;
+//        if (query.size() != barcode[0].size()) {
+//            cerr << "Warning " << query << " does not same length with other barcodes" << endl;
+//        };
+//
+//        // check exact match
+//        bool ismatched = false;
+//        for (size_t j = 0; j < barcode.size(); ++j) {
+//            if (query != barcode[j]) continue;
+//            ismatched = true;
+//            readBarcodeIdx[i] = j;
+//            readBarcodeMis[i] = 0;
+//            break;
+//        }
+//        if (ismatched) continue;
+//
+//        int minMismatch = query.size();
+//
+//        // check single base mutation
+//        for (size_t j = 0; j < barcode.size(); ++j) {
+//            int mismatch = 0;
+//            for (size_t k = 0; k < query.size(); ++k) {
+//                mismatch += (query[k] != barcode[j][k]);
+//                if (mismatch >= minEditDistance) {
+//                    mismatch = query.size();
+//                    break;
+//                }
+//            }
+//            if (mismatch < minMismatch) {
+//                minMismatch = mismatch;
+//                readBarcodeIdx[i] = j;
+//                readBarcodeMis[i] = minMismatch;
+//                if (minMismatch <= 1) continue;
+//            }
+//        }
+//        if (minMismatch <= 1) continue;
+//
+//        // check edit distance
+//        for (size_t j = 0; j < barcode.size(); ++j) {
+//            int mismatch = edit_distance(query, barcode[j]);
+//            if (mismatch < minMismatch) {
+//                minMismatch = mismatch;
+//                readBarcodeIdx[i] = j;
+//                readBarcodeMis[i] = minMismatch;
+//            }
+//        }
+//
+//    }
     cerr << "Done matching barcodes" << endl;
 
     /* write sequence barcodes assignment
@@ -240,10 +176,10 @@ int main(int argc, char* argv[]) {
      *     minEditDistance is calculated above
      *     nMismatch defaults to 1 allowing for base error; can be set by user
      */
-    string tmps = I1File + ".decode";
+    string tmps = arg.I1File + ".decode";
     size_t p = tmps.rfind('/');
     string fileName = p == string::npos ? tmps : tmps.substr(p + 1);
-    fileName = folder + "/" + fileName;
+    fileName = arg.outputFolder + "/" + fileName;
     ofstream FOUT(fileName.c_str());
     if (!FOUT) {
         cerr << "Can't open " << fileName << endl;
@@ -256,7 +192,7 @@ int main(int argc, char* argv[]) {
                 readBarcode_qpos[i + 1] - readBarcode_qpos[i] - 1);
 
         cerr << query << '\t' << readBarcodeMis[i] << endl;
-        if (readBarcodeMis[i] <= nMismatch) {
+        if (readBarcodeMis[i] <= arg.nMismatch) {
             FOUT << query << "\t"
                     << readBarcodeIdx[i] << "\t"
                     << barcode[ readBarcodeIdx[i] ] << "\t"
@@ -264,7 +200,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (readBarcodeMis[i] >= minEditDistance) readBarcodeIdx[i] = barcode.size();
-        if (readBarcodeMis[i] > nMismatch) readBarcodeIdx[i] = barcode.size();
+        if (readBarcodeMis[i] > arg.nMismatch) readBarcodeIdx[i] = barcode.size();
     }
     FOUT.close();
 
@@ -294,8 +230,8 @@ int main(int argc, char* argv[]) {
     /* Loop through read1 and read2 files
      * write to decoded files
      */
-    vector<string> inputReadFile(1, R1File);
-    if (R2File != "") inputReadFile.push_back(R2File);
+    vector<string> inputReadFile(1, arg.R1File);
+    if (arg.R2File != "") inputReadFile.push_back(arg.R2File);
 
     gzFile fp;
     kseq_t *seq;
@@ -312,7 +248,7 @@ int main(int argc, char* argv[]) {
         tmps = inputReadFile[iFile];
         p = tmps.rfind('/');
         fileName = p == string::npos ? tmps : tmps.substr(p + 1);
-        fileName = folder + "/" + fileName;
+        fileName = arg.outputFolder + "/" + fileName;
         for (size_t i = 0; i < barcode.size(); ++i) {
             if (!barcodeWrite[i]) continue;
             outputNames[i] = fileName + "_" + sampleid[i] + ".fastq.gz";
