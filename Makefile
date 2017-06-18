@@ -29,7 +29,8 @@ clean:
 	rm -f test/*.o test/idemp_test
 
 test:   idemp barcode_sample.txt I1.fastq R1.fastq R2.fastq
-	./idemp -b barcode_sample.txt -I1 I1.fastq -R1 R1.fastq -R2 R2.fastq -o test
+	./idemp -b barcode_sample.txt -I1 I1.fastq -R1 R1.fastq -R2 R2.fastq
+	./idemp -b data/barcode_sample.txt -I1 data/NI1.fastq -R1 data/NR1.fastq -R2 data/NR2.fastq
 
 unittest:   test/idemp_test.o idemp_func.o functions.o
 	$(CXX) $? -o ./test/idemp_test -lz $(CXXFLAGS)

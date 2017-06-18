@@ -12,7 +12,7 @@
 #include <unordered_map>
 #include <cstdlib>
 #include <stdexcept>
-using namespace std;
+//using namespace std;
 
 /**** user headers ****/
 #include "idemp_func.h"
@@ -26,27 +26,38 @@ void map_readbarcode(string & readBarcode, vector<size_t> & readBarcode_qpos, ve
         int minEditDistance,
         vector<int> & readBarcodeIdx, vector<int> & readBarcodeMis) {
 
+    std::unordered_map<std::string, int> barcodeDict;
+    std::unordered_map<std::string, int>::iterator got;
+    for (size_t j = 0; j < barcode.size(); ++j) {
+        got = barcodeDict.find(barcode[j]);
+        if (got != barcodeDict.end()) throw::invalid_argument("dupilcated barcode: " + barcode[j]);
+        barcodeDict[barcode[j]] = j;
+    }
+
+
     for (size_t i = 0; i < readBarcode_qpos.size() - 1; ++i) {
+
         string query = readBarcode.substr(readBarcode_qpos[i],
                 readBarcode_qpos[i + 1] - readBarcode_qpos[i] - 1);
+        readBarcodeIdx[i] = barcode.size();
+        readBarcodeMis[i] = barcode[0].length();
 
         if ((i + 1) % 1000000 == 0) cerr << i + 1 << endl;
         if (query.size() != barcode[0].size()) {
             cerr << "Warning " << query << " does not have same length with barcodes" << endl;
         };
 
-        // check exact match
+
+        // check exact match with barcode dictionary; most read barcodes should match 
         bool ismatched = false;
-        for (size_t j = 0; j < barcode.size(); ++j) {
-            if (query != barcode[j]) continue;
-            ismatched = true;
-            readBarcodeIdx[i] = j;
+        if (barcodeDict.find(query) != barcodeDict.end()) {
+            readBarcodeIdx[i] = barcodeDict[query];
             readBarcodeMis[i] = 0;
-            break;
+            ismatched = true;
         }
         if (ismatched) continue;
 
-        int minMismatch = query.size();
+        int minMismatch = barcode[0].size();
 
         // check single base mutation
         for (size_t j = 0; j < barcode.size(); ++j) {
@@ -62,12 +73,12 @@ void map_readbarcode(string & readBarcode, vector<size_t> & readBarcode_qpos, ve
                 minMismatch = mismatch;
                 readBarcodeIdx[i] = j;
                 readBarcodeMis[i] = minMismatch;
-                if (minMismatch <= 1) continue;
+                if (minMismatch <= 1) break;
             }
         }
-        if (minMismatch <= 1) continue;
+        if (minMismatch <= 1) continue; // next best
 
-        // check edit distance
+        // check edit distance for indel
         for (size_t j = 0; j < barcode.size(); ++j) {
             int mismatch = edit_distance(query, barcode[j]);
             if (mismatch < minMismatch) {
@@ -76,7 +87,6 @@ void map_readbarcode(string & readBarcode, vector<size_t> & readBarcode_qpos, ve
                 readBarcodeMis[i] = minMismatch;
             }
         }
-
     }
 
 }

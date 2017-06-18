@@ -112,7 +112,8 @@ int main(int argc, char* argv[]) {
     vector<int> readBarcodeIdx(readBarcode_qpos.size() - 1, barcode.size());
     vector<int> readBarcodeMis(readBarcode_qpos.size() - 1, barcode[0].size());
 
-    map_readbarcode(readBarcode, readBarcode_qpos, barcode, minEditDistance, readBarcodeIdx, readBarcodeMis);
+    map_readbarcode(readBarcode, readBarcode_qpos, barcode, minEditDistance,
+            readBarcodeIdx, readBarcodeMis);
     cerr << "Done matching barcodes" << endl;
 
     /* write sequence barcodes assignment
@@ -139,12 +140,12 @@ int main(int argc, char* argv[]) {
                 readBarcode_qpos[i + 1] - readBarcode_qpos[i] - 1);
 
         cerr << query << '\t' << readBarcodeMis[i] << endl;
-        if (readBarcodeMis[i] <= arg.nMismatch) {
-            FOUT << query << "\t"
-                    << readBarcodeIdx[i] << "\t"
-                    << barcode[ readBarcodeIdx[i] ] << "\t"
-                    << readBarcodeMis[i] << "\n";
-        }
+        string match = readBarcodeIdx[i] < barcode.size() ?
+                barcode[ readBarcodeIdx[i] ] : "undecoded";
+        FOUT << query << "\t" <<
+                readBarcodeIdx[i] << "\t" <<
+                match << "\t" <<
+                readBarcodeMis[i] << endl;
 
         if (readBarcodeMis[i] >= minEditDistance) readBarcodeIdx[i] = barcode.size();
         if (readBarcodeMis[i] > arg.nMismatch) readBarcodeIdx[i] = barcode.size();
@@ -200,7 +201,7 @@ int main(int argc, char* argv[]) {
             if (!barcodeWrite[i]) continue;
             outputNames[i] = fileName + "_" + sampleid[i] + ".fastq.gz";
         }
-        outputNames[barcode.size()] = fileName + "_unsigned.fastq.gz";
+        outputNames[barcode.size()] = fileName + "_undecoded.fastq.gz";
         for (size_t i = 0; i <= barcode.size(); ++i) {
             if (!barcodeWrite[i]) continue;
             cerr << i << "\t"
