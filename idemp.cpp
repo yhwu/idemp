@@ -139,7 +139,7 @@ int main(int argc, char* argv[]) {
         string query = readBarcode.substr(readBarcode_qpos[i],
                 readBarcode_qpos[i + 1] - readBarcode_qpos[i] - 1);
 
-        cerr << query << '\t' << readBarcodeMis[i] << endl;
+        // cerr << query << '\t' << readBarcodeMis[i] << endl;
         string match = readBarcodeIdx[i] < barcode.size() ?
                 barcode[ readBarcodeIdx[i] ] : "undecoded";
         FOUT << query << "\t" <<

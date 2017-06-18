@@ -1,6 +1,6 @@
 CXXFLAGS = -std=gnu++11 -O3
 
-DEBUG ?= 1
+DEBUG ?= 0
 ifeq ($(DEBUG), 1)
     CXXFLAGS += -g -DDEBUG
     CFLAGS += -g -DDEBUG
@@ -11,7 +11,7 @@ endif
 
 idemp: idemp.o idemp_func.o functions.o
 	$(CXX) $(CXXFLAGS) $? -o $@ -lz
-	
+
 idemp.o: idemp.cpp
 	$(CXX) $(CXXFLAGS) -c $? -o $@
 
@@ -28,11 +28,11 @@ clean:
 	rm -f *.o idemp
 	rm -f test/*.o test/idemp_test
 
-test:   idemp barcode_sample.txt I1.fastq R1.fastq R2.fastq
-	./idemp -b barcode_sample.txt -I1 I1.fastq -R1 R1.fastq -R2 R2.fastq
+test:   idemp data/barcode_sample.txt data/I1.fastq data/R1.fastq data/R2.fastq
+	./idemp -b data/barcode_sample.txt -I1 data/I1.fastq -R1 data/R1.fastq -R2 data/R2.fastq
 	./idemp -b data/barcode_sample.txt -I1 data/NI1.fastq -R1 data/NR1.fastq -R2 data/NR2.fastq
 
 unittest:   test/idemp_test.o idemp_func.o functions.o
 	$(CXX) $? -o ./test/idemp_test -lz $(CXXFLAGS)
 	./test/idemp_test
-	
+
