@@ -13,8 +13,8 @@ void test_parse_arguments() {
     const char* myargv[] = {"a.out", "-b", "barcodeFile", "-I1", "I1File", "-R1", "R1File", "-R2", "R2File"};
     char ** argv = const_cast<char**>(myargv);
     IdempArgument arg = parse_arguments(argc, argv);
-    assert ( (arg.I1File == "I1File") & (arg.R1File == "R1File")  & (arg.R2File == "R2File") & 
-            (arg.barcodeFile == "barcodeFile") & (arg.nMismatch==1));
+    assert ( (arg.I1File == "I1File") && (arg.R1File == "R1File")  && (arg.R2File == "R2File") && 
+            (arg.barcodeFile == "barcodeFile") && (arg.nMismatch==1));
 }
 
 
